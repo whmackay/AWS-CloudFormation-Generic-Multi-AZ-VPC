@@ -212,6 +212,7 @@
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ] },
         "MapPublicIpOnLaunch" : "True",
+		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PublicSubnetACidr" },
 		"Ipv6CidrBlock" : {
           "Fn::Join" : [
@@ -249,6 +250,7 @@
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ] },
         "MapPublicIpOnLaunch" : "True",
+		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PublicSubnetBCidr" },
 		"Ipv6CidrBlock" : {
           "Fn::Join" : [
@@ -286,6 +288,7 @@
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ] },
         "MapPublicIpOnLaunch" : "False",
+		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PrivateSubnetACidr" },
 		"Ipv6CidrBlock" : {
           "Fn::Join" : [
@@ -323,6 +326,7 @@
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ] },
         "MapPublicIpOnLaunch" : "False",
+		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PrivateSubnetBCidr" },
 		"Ipv6CidrBlock" : {
           "Fn::Join" : [
@@ -352,6 +356,27 @@
         ]
       }
     },
+	
+	"EIPNATGateway" : {
+	   "Type" : "AWS::EC2::EIP",
+	   "Properties" : {
+		  "Domain" : "vpc"
+	   }
+	},
+	
+	"NATGateway" : {
+	  "Type" : "AWS::EC2::NatGateway",
+	  "DependsOn" : [ "EIPNATGateway", "PublicSubnetB", "GatewayToInternet" ],
+	  "Properties" : {
+		"AllocationId" : { "Fn::GetAtt" : [ "EIPNATGateway", "AllocationId" ] },
+		"SubnetId" : { "Ref" : "PublicSubnetB" },
+		"Tags" : [
+			{ "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "NAT-Gateway" ] ] } },
+			{ "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
+			{ "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
+		]
+	  }
+	},
 
     "PublicRouteTable" : {
       "Type" : "AWS::EC2::RouteTable",
@@ -381,7 +406,7 @@
       "Properties" : {
         "RouteTableId" : { "Ref" : "PublicRouteTable" },
         "DestinationIpv6CidrBlock" : "::/0",
-        "EgressOnlyInternetGatewayId" : { "Ref" : "EgressInternetGateway" }
+        "GatewayId" : { "Ref" : "InternetGateway" }
       }
     },
 
@@ -394,6 +419,16 @@
           { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
           { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
         ]
+      }
+    },
+	
+	"PrivateIPv4Route" : {
+      "Type" : "AWS::EC2::Route",
+      "DependsOn" : "NATGateway",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivateRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NATGateway" }
       }
     },
 	
