@@ -14,6 +14,10 @@
         {
           "Label": { "default": "Network Configuration" },
           "Parameters": [ "VPCCidr", "PublicSubnetACidr", "PublicSubnetBCidr", "PrivateSubnetACidr", "PrivateSubnetBCidr" ]
+        },
+        {
+          "Label": { "default": "Security Configuration" },
+          "Parameters": [ "OriginIP" ]
         }
       ],
       "ParameterLabels" : {
@@ -45,32 +49,38 @@
 	
 	"VPCCidr" : {
       "Type" : "String",
-      "Description" : "To what project does this stack belong.",
+      "Description" : "Cidr for allocated IP range.",
 	  "Default" : "172.16.0.0/16"
     },
 	
 	"PublicSubnetACidr" : {
       "Type" : "String",
-      "Description" : "To what project does this stack belong.",
+      "Description" : "AZ A Public Subnet Cidr.",
 	  "Default" : "172.16.0.0/24"
     },
 	
 	"PublicSubnetBCidr" : {
       "Type" : "String",
-      "Description" : "To what project does this stack belong.",
+      "Description" : "AZ B Public Subnet Cidr",
 	  "Default" : "172.16.1.0/24"
     },
 	
 	"PrivateSubnetACidr" : {
       "Type" : "String",
-      "Description" : "To what project does this stack belong.",
+      "Description" : "AZ A Private Subnet Cidr.",
 	  "Default" : "172.16.10.0/24"
     },
 	
 	"PrivateSubnetBCidr" : {
       "Type" : "String",
-      "Description" : "To what project does this stack belong.",
+      "Description" : "AZ B Private Subnet Cidr.",
 	  "Default" : "172.16.11.0/24"
+    },
+
+    "OriginIP" : {
+      "Type" : "String",
+      "Description" : "Whitelisted IP for accessing VPC network and instances.",
+      "Default" : "0.0.0.0/0"
     }
   },
 
@@ -212,7 +222,6 @@
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ] },
         "MapPublicIpOnLaunch" : "True",
-		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PublicSubnetACidr" },
 		"Ipv6CidrBlock" : {
           "Fn::Join" : [
@@ -250,7 +259,6 @@
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ] },
         "MapPublicIpOnLaunch" : "True",
-		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PublicSubnetBCidr" },
 		"Ipv6CidrBlock" : {
           "Fn::Join" : [
@@ -287,7 +295,6 @@
       "Properties" : {
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ] },
-        "MapPublicIpOnLaunch" : "False",
 		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PrivateSubnetACidr" },
 		"Ipv6CidrBlock" : {
@@ -325,7 +332,6 @@
       "Properties" : {
         "VpcId" : { "Ref" : "VPC" },
         "AvailabilityZone" : { "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ] },
-        "MapPublicIpOnLaunch" : "False",
 		"AssignIpv6AddressOnCreation" : "True",
         "CidrBlock" : { "Ref" : "PrivateSubnetBCidr" },
 		"Ipv6CidrBlock" : {
@@ -486,6 +492,77 @@
       }
     },
 
+    "InboundIPv4PublicSSHNetworkAclEntry" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" },
+        "RuleNumber" : "100",
+        "Protocol" : "6",
+        "RuleAction" : "allow",
+        "Egress" : "false",
+        "CidrBlock" : { "Ref" : "OriginIP" },
+        "PortRange" : { "From" : "22", "To" : "22" }
+      }
+    },
+	
+	"InboundIPv4PublicRDPNetworkAclEntry" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" },
+        "RuleNumber" : "105",
+        "Protocol" : "6",
+        "RuleAction" : "allow",
+        "Egress" : "false",
+        "CidrBlock" : { "Ref" : "OriginIP" },
+        "PortRange" : { "From" : "3389", "To" : "3389" }
+      }
+    },
+
+    "OutboundIPv4PublicNetworkAclEntry" : {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "PublicSubnetNetworkAcl" },
+        "RuleNumber": "100",
+        "Protocol": "-1",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": "0",
+          "To": "65535"
+        }
+      }
+    },
+
+    "OutboundIPv6PublicNetworkAclEntry" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" },
+        "RuleNumber" : "200",
+        "Protocol" : "-1",
+        "RuleAction" : "allow",
+        "Egress" : "true",
+        "Ipv6CidrBlock" : "::/0",
+        "PortRange" : { "From" : "0", "To" : "65535" }
+      }
+    },
+
+    "PublicSubnetANACLAssociation" : {
+      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PublicSubnetA" },
+        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" }
+      }
+    },
+
+    "PublicSubnetBNACLAssociation" : {
+      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PublicSubnetB" },
+        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" }
+      }
+    },
+
     "PrivateSubnetNetworkAcl" : {
       "Type" : "AWS::EC2::NetworkAcl",
       "Properties" : {
@@ -498,48 +575,58 @@
       }
     },
 
-    "InboundPublicSSHNetworkAclEntry" : {
+    "InboundIPv4PrivateNetworkAclEntry" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
-        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" },
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
         "RuleNumber" : "100",
-        "Protocol" : "6",
+        "Protocol" : "-1",
         "RuleAction" : "allow",
         "Egress" : "false",
-        "CidrBlock" : "0.0.0.0/0",
-        "PortRange" : { "From" : "22", "To" : "22" }
-      }
-    },
-
-    "OutboundPublicNetworkAclEntry" : {
-      "Type" : "AWS::EC2::NetworkAclEntry",
-      "Properties" : {
-        "NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" },
-        "RuleNumber" : "100",
-        "Protocol" : "6",
-        "RuleAction" : "allow",
-        "Egress" : "true",
-        "CidrBlock" : "0.0.0.0/0",
+        "CidrBlock" : { "Fn::GetAtt" : [ "VPC", "CidrBlock"] },
         "PortRange" : { "From" : "0", "To" : "65535" }
       }
     },
-	
-	"PublicSubnetANACLAssociation" : {
-	  "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-	  "Properties" : {
-		"SubnetId" : { "Ref" : "PublicSubnetA" },
-		"NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" }
-	  }
-	},
-	
-	"PublicSubnetBNACLAssociation" : {
-	  "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
-	  "Properties" : {
-		"SubnetId" : { "Ref" : "PublicSubnetB" },
-		"NetworkAclId" : { "Ref" : "PublicSubnetNetworkAcl" }
-	  }
-	},
-	
+
+    "InboundIPv6PrivateNetworkAclEntry" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
+        "RuleNumber" : "200",
+        "Protocol" : "-1",
+        "RuleAction" : "allow",
+        "Egress" : "false",
+        "Ipv6CidrBlock" : { "Fn::Select" : [ "0", { "Fn::GetAtt" : [ "VPC", "Ipv6CidrBlocks" ] } ] },
+        "PortRange" : { "From" : "0", "To" : "65535" }
+      }
+    },
+
+    "OutboundIPv4PrivateNetworkAclEntry" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
+        "RuleNumber" : "100",
+        "Protocol" : "-1",
+        "RuleAction" : "allow",
+        "Egress" : "true",
+        "CidrBlock" : { "Fn::GetAtt" : [ "VPC", "CidrBlock"] },
+        "PortRange" : { "From" : "0", "To" : "65535" }
+      }
+    },
+
+    "OutboundIPv6PrivateNetworkAclEntry" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
+        "RuleNumber" : "200",
+        "Protocol" : "-1",
+        "RuleAction" : "allow",
+        "Egress" : "true",
+        "Ipv6CidrBlock" : { "Fn::Select" : [ "0", { "Fn::GetAtt" : [ "VPC", "Ipv6CidrBlocks" ] } ] },
+        "PortRange" : { "From" : "0", "To" : "65535" }
+      }
+    },
+
 	"PrivateSubnetANACLAssociation" : {
 	  "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
 	  "Properties" : {
@@ -566,13 +653,37 @@
             "IpProtocol" : "tcp",
             "FromPort" : "22",
             "ToPort" : "22",
-            "CidrIp" : "172.16.16.0/20"
+            "CidrIp" : { "Ref" : "VPCCidr" }
+          },
+		  {
+            "IpProtocol" : "tcp",
+            "FromPort" : "22",
+            "ToPort" : "22",
+            "CidrIp" : { "Ref" : "OriginIP" }
+          },
+		  {
+            "IpProtocol" : "tcp",
+            "FromPort" : "3389",
+            "ToPort" : "3389",
+            "CidrIp" : { "Ref" : "VPCCidr" }
+          },
+		  {
+            "IpProtocol" : "tcp",
+            "FromPort" : "3389",
+            "ToPort" : "33589",
+            "CidrIp" : { "Ref" : "OriginIP" }
           },
           {
             "IpProtocol" : "icmp",
             "FromPort" : "-1",
             "ToPort" : "-1",
-            "CidrIp" : "0.0.0.0/0"
+            "CidrIp" : { "Ref" : "VPCCidr" }
+          },
+		  {
+            "IpProtocol" : "icmp",
+            "FromPort" : "-1",
+            "ToPort" : "-1",
+            "CidrIp" : { "Ref" : "OriginIP" }
           }
         ],
         "Tags" : [
@@ -606,7 +717,9 @@
 			{
 			  "Sid": "Stmt1475025063221",
 			  "Effect": "Allow",
-			  "Principal": "*",
+			  "Principal": { 
+				"AWS" : { "Fn::Join" : [ "", [ "arn:aws:iam::", { "Ref" : "AWS::AccountId" }, ":root" ] ] } 
+				}, 
 			  "Action": "s3:PutObject",
 			  "Resource": { "Fn::Join" : [ "", [ "arn:aws:s3:::", { "Ref" : "S3Bucket" }, "/*" ] ] }
 			}
