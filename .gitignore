@@ -12,6 +12,7 @@ gen
 scripts/*
 launchtemplate/*
 launch-configuration-templates/*
+virtenv
 
 # Files
 temp.json
