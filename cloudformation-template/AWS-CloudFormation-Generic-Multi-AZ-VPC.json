@@ -658,7 +658,8 @@
     "EC2DefaultSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
-        "GroupDescription" : "Enable access to the EC2 host",
+        "GroupName" : "EC2DefaultSecurityGroup",
+	"GroupDescription" : "Enable access to the EC2 host",
         "VpcId" : { "Ref" : "VPC" },
         "SecurityGroupIngress" : [
           {
@@ -682,7 +683,7 @@
 		  {
             "IpProtocol" : "tcp",
             "FromPort" : "3389",
-            "ToPort" : "33589",
+            "ToPort" : "3389",
             "CidrIp" : { "Ref" : "OriginIP" }
           },
           {
