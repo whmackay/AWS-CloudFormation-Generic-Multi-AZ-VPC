@@ -709,7 +709,7 @@
             "CidrIp" : { "Ref" : "OriginIP" }
           },
           {
-            "IpProtocol" : "icmp",
+            "IpProtocol" : "-1",
             "FromPort" : "-1",
             "ToPort" : "-1",
             "CidrIp" : { "Ref" : "VPCCidr" }
