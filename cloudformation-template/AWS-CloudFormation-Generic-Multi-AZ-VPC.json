@@ -18,6 +18,10 @@
         {
           "Label": { "default": "Security Configuration" },
           "Parameters": [ "OriginIP" ]
+        },
+	{
+          "Label": { "default": "Options" },
+          "Parameters": [ "NATGatewayOption" ]
         }
       ],
       "ParameterLabels" : {
@@ -81,13 +85,28 @@
       "Type" : "String",
       "Description" : "Whitelisted IP for accessing VPC network and instances.",
       "Default" : "0.0.0.0/0"
+    },
+	  
+    "NATGatewayOption" : {
+       	"Type" : "String",
+       	"Description" : "Option : NAT Gateway will be provisioned for IPv4 egress from private subnets at additional cost.",
+	"AllowedValues" : [
+		"True",
+		"False"
+      	],
+	"Default" : "False"
     }
+	  
   },
 
   "Mappings" : {
     "Level1Key" : {
       "Level2Key"     : { "Level3Key" : "Value" }
     }
+  },
+	
+  "Conditions" : {
+	  "CreateNATGateway" : { "Fn::Equals" : [ {"Ref" : "NATGatewayOption"}, "True" ] }
   },
 
   "Resources" : {
@@ -365,6 +384,7 @@
 	
 	"EIPNATGateway" : {
 	   "Type" : "AWS::EC2::EIP",
+	   "Condition" : "CreateNATGateway",
 	   "Properties" : {
 		  "Domain" : "vpc"
 	   }
@@ -372,6 +392,7 @@
 	
 	"NATGateway" : {
 	  "Type" : "AWS::EC2::NatGateway",
+	  "Condition" : "CreateNATGateway",
 	  "DependsOn" : [ "EIPNATGateway", "PublicSubnetB", "GatewayToInternet" ],
 	  "Properties" : {
 		"AllocationId" : { "Fn::GetAtt" : [ "EIPNATGateway", "AllocationId" ] },
@@ -430,6 +451,7 @@
 	
 	"PrivateIPv4Route" : {
       "Type" : "AWS::EC2::Route",
+	  "Condition" : "CreateNATGateway",
       "DependsOn" : "NATGateway",
       "Properties" : {
         "RouteTableId" : { "Ref" : "PrivateRouteTable" },
