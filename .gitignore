@@ -16,3 +16,4 @@ virtenv
 
 # Files
 temp.json
+.DS_Store

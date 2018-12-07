@@ -263,6 +263,7 @@
 	
 	"EgressInternetGateway" : {
 	  "Type": "AWS::EC2::EgressOnlyInternetGateway",
+      "Condition" : "CreatePrivateEgress",
 	  "Properties": {
 		"VpcId": { "Ref" : "VPC" }
 	  }
