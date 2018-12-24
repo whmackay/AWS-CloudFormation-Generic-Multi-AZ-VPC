@@ -26,7 +26,7 @@
       ],
       "ParameterLabels" : {
         "ProjectName" : { "default" : "What is the Project Name?" },
-        "StackType" : { "default" : "Is this Production, Devevelopment, or Test Environment?"}
+        "StackType" : { "default" : "Is this Production, Development, or Test Environment?"}
       }
     }
   },
