@@ -213,7 +213,7 @@
 
     "VPCSSMEndPoint" : {
       "Type" : "AWS::EC2::VPCEndpoint",
-      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2DefaultSecurityGroup" ],
+      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2SecurityGroup" ],
       "Properties" : {
         "VpcId" : { "Ref" : "VPC" },
         "ServiceName" : { "Fn::Join": [ ".", [ "com.amazonaws", { "Ref": "AWS::Region" }, "ssm" ] ] },
@@ -226,7 +226,7 @@
 
     "VPCSSMMessagesEndPoint" : {
       "Type" : "AWS::EC2::VPCEndpoint",
-      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2DefaultSecurityGroup" ],
+      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2SecurityGroup" ],
       "Properties" : {
         "VpcId" : { "Ref" : "VPC" },
         "ServiceName" : { "Fn::Join": [ ".", [ "com.amazonaws", { "Ref": "AWS::Region" }, "ssmmessages" ] ] },
@@ -239,7 +239,7 @@
 
     "VPCEC2MessagesEndPoint" : {
       "Type" : "AWS::EC2::VPCEndpoint",
-      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2DefaultSecurityGroup" ],
+      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2SecurityGroup" ],
       "Properties" : {
         "VpcId" : { "Ref" : "VPC" },
         "ServiceName" : { "Fn::Join": [ ".", [ "com.amazonaws", { "Ref": "AWS::Region" }, "ec2messages" ] ] },
@@ -764,11 +764,156 @@
 	  }
 	},
 
-    "EC2DefaultSecurityGroup" : {
+    "EKSIAMRole" : {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument" : {
+          "Version" : "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "eks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns" : [
+          "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+          "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+        ],
+        "RoleName": { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Role" ] ] }
+      }
+    },
+
+    "EKSNodeInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "DependsOn" : [ "EKSNodeIAMRole" ],
+      "Properties": {
+        "Roles": [ { "Ref" : "EKSNodeIAMRole" } ],
+        "Path" : "/",
+        "InstanceProfileName": { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Node-Instance-Profile" ] ] }
+      }
+    },
+
+    "EKSNodeIAMRole" : {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument" : {
+          "Version" : "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns" : [
+          "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+          "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        ],
+        "RoleName": { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Node-Role" ] ] }
+      }
+    },
+
+    "EKSSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
-        "GroupName" : "EC2DefaultSecurityGroup",
-	"GroupDescription" : "Enable access to the EC2 host",
+        "GroupName" : "EKSSecurityGroup",
+        "GroupDescription" : "Enable access to EKS backplane",
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          { "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-SecurityGroup" ] ] } },
+          { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
+          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
+        ]
+      }
+    },
+
+    "EKSHTTPSSecurityGroupIngress" : {
+      "Type" : "AWS::EC2::SecurityGroupIngress",
+      "Properties" : {
+        "Description" : "HTTPS Ingress Rule for EKS Security Group",
+        "FromPort" : "443",
+        "ToPort" : "443",
+        "GroupId" : { "Ref" : "EKSSecurityGroup" },
+        "IpProtocol" : "tcp",
+        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
+      }
+    },
+
+    "EKSEmpheralTCPSecurityGroupIngress" : {
+      "Type" : "AWS::EC2::SecurityGroupIngress",
+      "Properties" : {
+        "Description" : "HTTPS Ingress Rule for EKS Security Group",
+        "FromPort" : "1025",
+        "ToPort" : "65535",
+        "GroupId" : { "Ref" : "EKSSecurityGroup" },
+        "IpProtocol" : "tcp",
+        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
+      }
+    },
+
+    "EKSNodeSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupName" : "EKSNodeSecurityGroup",
+        "GroupDescription" : "Enable access to EKS worker nodes",
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          { "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Node-SecurityGroup" ] ] } },
+          { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
+          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
+        ]
+      }
+    },
+
+    "EKSNodeHTTPSSecurityGroupIngress" : {
+      "Type" : "AWS::EC2::SecurityGroupIngress",
+      "Properties" : {
+        "Description" : "HTTPS Ingress Rule for EKS Node Security Group",
+        "FromPort" : "443",
+        "ToPort" : "443",
+        "GroupId" : { "Ref" : "EKSNodeSecurityGroup" },
+        "IpProtocol" : "tcp",
+        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
+      }
+    },
+
+    "EKSNodeEmpheralTCPSecurityGroupIngress" : {
+      "Type" : "AWS::EC2::SecurityGroupIngress",
+      "Properties" : {
+        "Description" : "HTTPS Ingress Rule for EKS NodemSecurity Group",
+        "FromPort" : "1025",
+        "ToPort" : "65535",
+        "GroupId" : { "Ref" : "EKSNodeSecurityGroup" },
+        "IpProtocol" : "tcp",
+        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
+      }
+    },
+
+    "EKSNodeAllTrafficSecurityGroupIngress" : {
+      "Type" : "AWS::EC2::SecurityGroupIngress",
+      "Properties" : {
+        "Description" : "All Traffic Ingress Rule for EKS Node Security Group",
+        "FromPort" : "-1",
+        "ToPort" : "-1",
+        "GroupId" : { "Ref" : "EKSNodeSecurityGroup" },
+        "IpProtocol" : "-1",
+        "SourceSecurityGroupId" :  { "Ref" : "EKSNodeSecurityGroup" }
+      }
+    },
+
+    "EC2SecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupName" : "EC2SecurityGroup",
+	    "GroupDescription" : "Enable access to the EC2 host",
         "VpcId" : { "Ref" : "VPC" },
         "SecurityGroupIngress" : [
           {
@@ -837,7 +982,6 @@
         ]
       }
     },
-
 
 	"S3Bucket" : {
 		"Type" : "AWS::S3::Bucket",
