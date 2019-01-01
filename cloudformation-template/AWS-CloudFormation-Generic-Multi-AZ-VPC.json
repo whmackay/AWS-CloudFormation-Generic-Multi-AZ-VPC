@@ -200,7 +200,8 @@
               "Resource": [
                 { "Fn::Join" : [ "", [ "arn:aws:s3:::" , { "Ref" : "S3Bucket" }, "/*" ] ] },
                 { "Fn::Join" : [ "", [ "arn:aws:s3:::" , "patch-baseline-snapshot", { "Ref" : "AWS::Region" }, "/*" ] ] },
-                { "Fn::Join" : [ "", [ "arn:aws:s3:::" , "aws-ssm", { "Ref" : "AWS::Region" }, "/*" ] ] }
+                { "Fn::Join" : [ "", [ "arn:aws:s3:::" , "aws-ssm", { "Ref" : "AWS::Region" }, "/*" ] ] },
+                { "Fn::Join" : [ "", [ "arn:aws:s3:::*" ] ] }
               ]
             }
           ]
@@ -610,7 +611,7 @@
         "RuleAction" : "allow",
         "Egress" : "false",
         "CidrBlock" : "0.0.0.0/0",
-        "PortRange" : { "From" : "1024", "To" : "65535" }
+        "PortRange" : { "From" : "1025", "To" : "65535" }
       }
     },
 	
@@ -623,7 +624,7 @@
         "RuleAction" : "allow",
         "Egress" : "false",
         "CidrBlock" : "0.0.0.0/0",
-        "PortRange" : { "From" : "1024", "To" : "65535" }
+        "PortRange" : { "From" : "1025", "To" : "65535" }
       }
     },
 	  
@@ -696,7 +697,7 @@
       }
     },
 
-    "InboundIPv4PrivateNetworkAclEntry" : {
+    "AllowInboundIPv4FromAllVPCtoPrivateSubnets" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
         "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
@@ -709,7 +710,7 @@
       }
     },
 
-    "InboundIPv6PrivateNetworkAclEntry" : {
+    "AllowInboundIPv6FromAllVPCtoPrivateSubnets" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
         "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
@@ -722,7 +723,20 @@
       }
     },
 
-    "OutboundIPv4PrivateNetworkAclEntry" : {
+    "AllowInboundPublicEmpheralIPv4TrafficToPrivateSubnets" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
+        "RuleNumber" : "300",
+        "Protocol" : "6",
+        "RuleAction" : "allow",
+        "Egress" : "false",
+        "CidrBlock" : "0.0.0.0/0",
+        "PortRange" : { "From" : "1025", "To" : "65535" }
+      }
+    },
+
+    "AllowOutboundIPv4FromPrivateSubnetsToAllVPC" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
         "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
@@ -735,7 +749,7 @@
       }
     },
 
-    "OutboundIPv6PrivateNetworkAclEntry" : {
+    "AllowOutboundIPv6FromPrivateSubnetsToAllVPC" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
         "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
@@ -745,6 +759,32 @@
         "Egress" : "true",
         "Ipv6CidrBlock" : { "Fn::Select" : [ "0", { "Fn::GetAtt" : [ "VPC", "Ipv6CidrBlocks" ] } ] },
         "PortRange" : { "From" : "0", "To" : "65535" }
+      }
+    },
+
+    "AllowHTTPsOutboundIPv4FromPrivateSubnetsToPublic" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
+        "RuleNumber" : "300",
+        "Protocol" : "6",
+        "RuleAction" : "allow",
+        "Egress" : "true",
+        "CidrBlock" : "0.0.0.0/0",
+        "PortRange" : { "From" : "443", "To" : "443" }
+      }
+    },
+
+    "AllowHTTPsOutboundIPv6FromPrivateSubnetsToPublic" : {
+      "Type" : "AWS::EC2::NetworkAclEntry",
+      "Properties" : {
+        "NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" },
+        "RuleNumber" : "400",
+        "Protocol" : "6",
+        "RuleAction" : "allow",
+        "Egress" : "true",
+        "Ipv6CidrBlock" : "::/0",
+        "PortRange" : { "From" : "443", "To" : "443" }
       }
     },
 
@@ -763,151 +803,6 @@
 		"NetworkAclId" : { "Ref" : "PrivateSubnetNetworkAcl" }
 	  }
 	},
-
-    "EKSIAMRole" : {
-      "Type": "AWS::IAM::Role",
-      "Properties": {
-        "AssumeRolePolicyDocument" : {
-          "Version" : "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "eks.amazonaws.com"
-              },
-              "Action": "sts:AssumeRole"
-            }
-          ]
-        },
-        "ManagedPolicyArns" : [
-          "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
-          "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
-        ],
-        "RoleName": { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Role" ] ] }
-      }
-    },
-
-    "EKSNodeInstanceProfile": {
-      "Type": "AWS::IAM::InstanceProfile",
-      "DependsOn" : [ "EKSNodeIAMRole" ],
-      "Properties": {
-        "Roles": [ { "Ref" : "EKSNodeIAMRole" } ],
-        "Path" : "/",
-        "InstanceProfileName": { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Node-Instance-Profile" ] ] }
-      }
-    },
-
-    "EKSNodeIAMRole" : {
-      "Type": "AWS::IAM::Role",
-      "Properties": {
-        "AssumeRolePolicyDocument" : {
-          "Version" : "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "ec2.amazonaws.com"
-              },
-              "Action": "sts:AssumeRole"
-            }
-          ]
-        },
-        "ManagedPolicyArns" : [
-          "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-          "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-        ],
-        "RoleName": { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Node-Role" ] ] }
-      }
-    },
-
-    "EKSSecurityGroup" : {
-      "Type" : "AWS::EC2::SecurityGroup",
-      "Properties" : {
-        "GroupName" : "EKSSecurityGroup",
-        "GroupDescription" : "Enable access to EKS backplane",
-        "VpcId" : { "Ref" : "VPC" },
-        "Tags" : [
-          { "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-SecurityGroup" ] ] } },
-          { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
-          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
-        ]
-      }
-    },
-
-    "EKSHTTPSSecurityGroupIngress" : {
-      "Type" : "AWS::EC2::SecurityGroupIngress",
-      "Properties" : {
-        "Description" : "HTTPS Ingress Rule for EKS Security Group",
-        "FromPort" : "443",
-        "ToPort" : "443",
-        "GroupId" : { "Ref" : "EKSSecurityGroup" },
-        "IpProtocol" : "tcp",
-        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
-      }
-    },
-
-    "EKSEmpheralTCPSecurityGroupIngress" : {
-      "Type" : "AWS::EC2::SecurityGroupIngress",
-      "Properties" : {
-        "Description" : "HTTPS Ingress Rule for EKS Security Group",
-        "FromPort" : "1025",
-        "ToPort" : "65535",
-        "GroupId" : { "Ref" : "EKSSecurityGroup" },
-        "IpProtocol" : "tcp",
-        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
-      }
-    },
-
-    "EKSNodeSecurityGroup" : {
-      "Type" : "AWS::EC2::SecurityGroup",
-      "Properties" : {
-        "GroupName" : "EKSNodeSecurityGroup",
-        "GroupDescription" : "Enable access to EKS worker nodes",
-        "VpcId" : { "Ref" : "VPC" },
-        "Tags" : [
-          { "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "EKS-Node-SecurityGroup" ] ] } },
-          { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
-          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
-        ]
-      }
-    },
-
-    "EKSNodeHTTPSSecurityGroupIngress" : {
-      "Type" : "AWS::EC2::SecurityGroupIngress",
-      "Properties" : {
-        "Description" : "HTTPS Ingress Rule for EKS Node Security Group",
-        "FromPort" : "443",
-        "ToPort" : "443",
-        "GroupId" : { "Ref" : "EKSNodeSecurityGroup" },
-        "IpProtocol" : "tcp",
-        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
-      }
-    },
-
-    "EKSNodeEmpheralTCPSecurityGroupIngress" : {
-      "Type" : "AWS::EC2::SecurityGroupIngress",
-      "Properties" : {
-        "Description" : "HTTPS Ingress Rule for EKS NodemSecurity Group",
-        "FromPort" : "1025",
-        "ToPort" : "65535",
-        "GroupId" : { "Ref" : "EKSNodeSecurityGroup" },
-        "IpProtocol" : "tcp",
-        "SourceSecurityGroupId" :  { "Ref" : "EKSSecurityGroup" }
-      }
-    },
-
-    "EKSNodeAllTrafficSecurityGroupIngress" : {
-      "Type" : "AWS::EC2::SecurityGroupIngress",
-      "Properties" : {
-        "Description" : "All Traffic Ingress Rule for EKS Node Security Group",
-        "FromPort" : "-1",
-        "ToPort" : "-1",
-        "GroupId" : { "Ref" : "EKSNodeSecurityGroup" },
-        "IpProtocol" : "-1",
-        "SourceSecurityGroupId" :  { "Ref" : "EKSNodeSecurityGroup" }
-      }
-    },
 
     "EC2SecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
@@ -1014,7 +909,7 @@
 		  ]
 		}
 	 }
-	}
+    }
   },
 
   "Outputs" : {
@@ -1025,6 +920,17 @@
     "S3BucketName" : {
       "Description" : "Cloud Stack Temporary S3 Bucket",
       "Value" : { "Ref" : "S3Bucket" }
+    },
+    "PrivateNACL" : {
+      "Description" : "Cloud Stack Temporary S3 Bucket",
+      "Value" : { "Ref" : "PrivateSubnetNetworkAcl" }
+    },
+    "PublicNACL" : {
+      "Description": "Cloud Stack Temporary S3 Bucket",
+      "Value": {
+        "Ref": "PublicSubnetNetworkAcl"
+      }
     }
+
   }
 }
