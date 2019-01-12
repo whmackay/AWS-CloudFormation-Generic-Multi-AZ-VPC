@@ -915,7 +915,10 @@
   "Outputs" : {
     "VPCId" : {
       "Description" : "VPCId of the newly created VPC",
-      "Value" :  { "Ref" : "VPC" }
+      "Value" :  { "Ref" : "VPC" },
+      "Export" : {
+        "Name" : { "Fn::Join" : [ ":", [ { "Ref" : "AWS::StackName" }, "VPCId" ] ] }
+      }
 	},
     "S3BucketName" : {
       "Description" : "Cloud Stack Temporary S3 Bucket",
@@ -929,6 +932,34 @@
       "Description": "Cloud Stack Temporary S3 Bucket",
       "Value": {
         "Ref": "PublicSubnetNetworkAcl"
+      }
+    },
+    "PublicSubnetA" : {
+      "Description" : "Logical ID of the newly created subnet",
+      "Value" :  { "Ref" : "PublicSubnetA" },
+      "Export" : {
+        "Name" :  { "Fn::Join" : [ ":", [ { "Ref" : "AWS::StackName" }, "PublicSubnetA" ] ] }
+      }
+    },
+    "PublicSubnetB" : {
+      "Description" : "Logical ID of the newly created subnet",
+      "Value" :  { "Ref" : "PublicSubnetB" },
+      "Export" : {
+        "Name" : { "Fn::Join" : [ ":", [ { "Ref" : "AWS::StackName" }, "PublicSubnetB" ] ] }
+      }
+    },
+    "PrivateSubnetA" : {
+      "Description" : "Logical ID of the newly created subnet",
+      "Value" :  { "Ref" : "PrivateSubnetA" },
+      "Export" : {
+        "Name" : { "Fn::Join" : [ ":", [ { "Ref" : "AWS::StackName" }, "PrivateSubnetA" ] ] }
+      }
+    },
+    "PrivateSubnetB" : {
+      "Description" : "Logical ID of the newly created subnet",
+      "Value" :  { "Ref" : "PrivateSubnetB" },
+      "Export" : {
+        "Name" : { "Fn::Join" : [ ":", [ { "Ref" : "AWS::StackName" }, "PrivateSubnetB" ] ] }
       }
     }
 
