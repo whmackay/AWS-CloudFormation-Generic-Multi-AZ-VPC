@@ -250,6 +250,19 @@
         "SecurityGroupIds" : [ { "Ref" : "VPCEndPointSecurityGroup" } ]
       }
     },
+
+    "VPCEC2APIEndPoint" : {
+      "Type" : "AWS::EC2::VPCEndpoint",
+      "DependsOn" : [ "PrivateSubnetA", "PrivateSubnetB", "EC2SecurityGroup" ],
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "ServiceName" : { "Fn::Join": [ ".", [ "com.amazonaws", { "Ref": "AWS::Region" }, "execute-api" ] ] },
+        "VpcEndpointType" : "Interface",
+        "PrivateDnsEnabled" : "True",
+        "SubnetIds" : [ { "Ref" : "PrivateSubnetA" }, { "Ref" : "PrivateSubnetB" } ],
+        "SecurityGroupIds" : [ { "Ref" : "VPCEndPointSecurityGroup" } ]
+      }
+    },
 	
 	"InternetGateway" : {
       "Type" : "AWS::EC2::InternetGateway",
@@ -384,7 +397,8 @@
         "Tags" : [
           { "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "PrivateSubnetA" ] ] } },
           { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
-          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
+          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } },
+          { "Key" : "kubernetes.io/role/internal-elb", "Value" : "1" }
         ]
       }
     },
@@ -421,7 +435,8 @@
         "Tags" : [
           { "Key" : "Name", "Value" : { "Fn::Join" : [ "-", [ { "Ref" : "AWS::StackName" }, "PrivateSubnetB" ] ] } },
           { "Key" : "Project", "Value" : { "Ref" : "ProjectName" } },
-          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } }
+          { "Key" : "StackType", "Value" : { "Ref" : "StackType" } },
+          { "Key" : "kubernetes.io/role/internal-elb", "Value" : "1" }
         ]
       }
     },
